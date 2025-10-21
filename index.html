@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Calendario Manuale</title>
+  <meta name="description" content="Calendario manuale con eventi, salvataggio locale, export/import JSON." />
+  <style>
+    :root{
+      --bg:#0f172a;        /* slate-900 */
+      --panel:#111827;     /* gray-900 */
+      --muted:#94a3b8;     /* slate-400 */
+      --text:#e5e7eb;      /* gray-200 */
+      --primary:#22c55e;   /* green-500 */
+      --accent:#38bdf8;    /* sky-400 */
+      --danger:#ef4444;    /* red-500 */
+      --border:#1f2937;    /* gray-800 */
+      --daybg:#0b1227;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:linear-gradient(180deg,#0b1020, #0e1328 60%, #0b1020);
+      color:var(--text); font-family:Inter,system-ui,Segoe UI,Roboto,Arial,Helvetica,sans-serif;
+      -webkit-font-smoothing:antialiased; line-height:1.35;
+    }
+    .app{max-width:1100px;margin:24px auto;padding:16px}
+    header{
+      display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px
+    }
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{
+      width:36px;height:36px;border-radius:10px;background:
+        radial-gradient(60% 80% at 30% 30%, var(--accent), transparent 60%),
+        radial-gradient(60% 80% at 70% 70%, var(--primary), transparent 60%),
+        linear-gradient(135deg,#172554,#0b1020);
+      box-shadow:0 8px 30px rgba(56,189,248,.25), inset 0 0 0 1px #1f2b57;
+    }
+    h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.3px}
+    .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .seg{
+      display:inline-flex; border:1px solid var(--border); border-radius:10px; overflow:hidden;
+      background:rgba(255,255,255,.03)
+    }
+    .seg button{
+      appearance:none;background:transparent;color:var(--text);padding:8px 12px;border:0;cursor:pointer
+    }
+    .seg button:hover{background:rgba(255,255,255,.06)}
+    .pill{
+      padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.03);
+      color:var(--text);cursor:pointer
+    }
+    .pill:hover{background:rgba(255,255,255,.06)}
+    .month{
+      display:flex;align-items:center;gap:10px;font-weight:700
+    }
+    .month .todaybtn{margin-left:8px;font-size:12px;color:var(--muted)}
+    .grid{
+      display:grid;grid-template-columns:repeat(7,1fr);gap:8px
+    }
+    .dow{text-transform:uppercase;font-size:11px;color:var(--muted);letter-spacing:.12em;text-align:center}
+    .day{
+      min-height:120px;background:var(--daybg);
+      border:1px solid var(--border); border-radius:12px; padding:10px; position:relative;
+      display:flex;flex-direction:column; gap:6px;
+    }
+    .day:hover{outline:1.5px solid rgba(56,189,248,.45)}
+    .day .num{
+      font-size:12px;color:var(--muted);display:flex;align-items:center;justify-content:space-between
+    }
+    .day .num .badge-today{
+      background:var(--accent);color:#001226;border-radius:999px;padding:2px 8px;font-weight:700;margin-left:auto
+    }
+    .day .num .outside{opacity:.4}
+    .events{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+    .ev{
+      font-size:12px;line-height:1.2;padding:6px 8px;border-radius:8px;border:1px solid var(--border);
+      background:rgba(255,255,255,.04);cursor:pointer;display:flex;gap:6px;align-items:center;word-break:break-word;
+    }
+    .dot{width:8px;height:8px;border-radius:50%}
+    .more{font-size:12px;color:var(--muted)}
+    .legend{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px}
+    .legend .chip{width:10px;height:10px;border-radius:3px;border:1px solid var(--border)}
+    .footer{
+      display:flex;justify-content:space-between;align-items:center;margin-top:14px;color:var(--muted);font-size:12px
+    }
+    /* dialog */
+    dialog{
+      border:1px solid var(--border); border-radius:16px; padding:0; background:var(--panel); color:var(--text);
+      width:min(520px,92vw)
+    }
+    dialog::backdrop{background:rgba(0,0,0,.5)}
+    .dlg-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)}
+    .dlg-body{padding:14px 16px;display:grid;gap:10px}
+    .row{display:grid;gap:6px}
+    label{font-size:12px;color:var(--muted)}
+    input,textarea,select{
+      width:100%;background:rgba(255,255,255,.04);color:var(--text);border:1px solid var(--border);
+      border-radius:10px;padding:10px; font:inherit
+    }
+    textarea{min-height:90px;resize:vertical}
+    .dlg-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;border-top:1px solid var(--border)}
+    .btn{
+      appearance:none;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);
+      padding:10px 14px;border-radius:10px;cursor:pointer
+    }
+    .btn.primary{background:var(--primary);border-color:transparent;color:#08210f;font-weight:700}
+    .btn.accent{background:var(--accent);border-color:transparent;color:#001226;font-weight:700}
+    .btn.danger{background:var(--danger);border-color:transparent;color:#2a0404;font-weight:700}
+    .btn:hover{filter:brightness(1.05)}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+    .sr-only{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+    @media (max-width:700px){ .day{min-height:96px} }
+    @page { size: A4 portrait; margin: 14mm }
+    @media print{
+      header, .footer, dialog{display:none !important}
+      body{background:#fff;color:#000}
+      .day{break-inside:avoid; background:#fff; border-color:#ddd}
+      .ev{border-color:#ddd}
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>Calendario Manuale</h1>
+          <div class="legend" aria-hidden="true">
+            <span class="chip" style="background:#38bdf8"></span> Lavoro
+            <span class="chip" style="background:#22c55e"></span> Personale
+            <span class="chip" style="background:#f59e0b"></span> Altro
+          </div>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="month" aria-live="polite">
+          <button class="pill" id="prevBtn" title="Mese precedente">◀</button>
+          <span id="monthLabel">Mese Anno</span>
+          <button class="pill" id="nextBtn" title="Mese successivo">▶</button>
+          <button class="pill todaybtn" id="todayBtn" title="Vai a oggi">Oggi</button>
+        </div>
+        <div class="seg" role="group" aria-label="Vista calendario">
+          <button id="viewMonth" aria-pressed="true">Mese</button>
+          <!-- Spazio per viste future (Settimana/Giorno) -->
+        </div>
+        <div class="toolbar">
+          <button class="pill" id="addQuick">+ Aggiungi evento</button>
+          <button class="pill" id="exportBtn">Esporta JSON</button>
+          <label class="pill" style="cursor:pointer">
+            <input id="importInput" type="file" accept="application/json" class="sr-only" />
+            Importa JSON
+          </label>
+          <button class="pill" onclick="window.print()">Stampa</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="grid" aria-label="Griglia calendario">
+      <div class="dow">Lun</div><div class="dow">Mar</div><div class="dow">Mer</div>
+      <div class="dow">Gio</div><div class="dow">Ven</div><div class="dow">Sab</div><div class="dow">Dom</div>
+      <div id="days" class="days"></div>
+    </section>
+
+    <div class="footer">
+      <div>Salvataggio automatico su questo dispositivo.</div>
+      <div>© <span id="yearNow"></span> Calendario Manuale</div>
+    </div>
+  </div>
+
+  <!-- Dialog evento -->
+  <dialog id="eventDlg" aria-labelledby="dlgTitle">
+    <form method="dialog" id="eventForm">
+      <div class="dlg-head">
+        <div id="dlgTitle">Evento</div>
+        <button class="btn" value="cancel" aria-label="Chiudi">✕</button>
+      </div>
+      <div class="dlg-body">
+        <div class="row">
+          <label for="evDate">Data</label>
+          <input type="date" id="evDate" required />
+        </div>
+        <div class="row">
+          <label for="evTitle">Titolo</label>
+          <input type="text" id="evTitle" placeholder="Es. Riunione, Compleanno..." required />
+        </div>
+        <div class="row" style="display:grid;grid-template-columns:1fr 1fr; gap:8px">
+          <div class="row">
+            <label for="evTimeStart">Inizio</label>
+            <input type="time" id="evTimeStart" />
+          </div>
+          <div class="row">
+            <label for="evTimeEnd">Fine</label>
+            <input type="time" id="evTimeEnd" />
+          </div>
+        </div>
+        <div class="row">
+          <label for="evCategory">Categoria/Colore</label>
+          <select id="evCategory">
+            <option value="#38bdf8">Lavoro</option>
+            <option value="#22c55e" selected>Personale</option>
+            <option value="#f59e0b">Altro</option>
+            <option value="#ef4444">Urgente</option>
+            <option value="#a78bfa">Studio</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="evNotes">Note</label>
+          <textarea id="evNotes" placeholder="Dettagli, luogo, link..."></textarea>
+        </div>
+      </div>
+      <div class="dlg-actions">
+        <div class="toolbar">
+          <button class="btn danger" type="button" id="deleteBtn">Elimina</button>
+        </div>
+        <div class="toolbar">
+          <button class="btn" value="cancel">Annulla</button>
+          <button class="btn accent" id="saveBtn" value="default">Salva</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    ;(() => {
+      const $ = s => document.querySelector(s)
+      const $$ = s => Array.from(document.querySelectorAll(s))
+      const daysEl = $('#days')
+      const monthLabel = $('#monthLabel')
+      const yearNow = $('#yearNow')
+      yearNow.textContent = new Date().getFullYear()
+
+      const STORAGE_KEY = 'manual-calendar-v1'
+      let state = {
+        // focusDate is the first day of the currently displayed month
+        focusDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        events: loadEvents(),
+        // transient selection
+        selectedDateISO: null,
+        editingId: null,
+      }
+
+      function loadEvents(){
+        try{
+          const raw = localStorage.getItem(STORAGE_KEY)
+          if(!raw) return []
+          const arr = JSON.parse(raw)
+          return Array.isArray(arr) ? arr : []
+        }catch(e){ return [] }
+      }
+      function saveEvents(){
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.events))
+      }
+
+      function formatMonthYear(d){
+        return d.toLocaleDateString('it-IT', { month:'long', year:'numeric' })
+          .replace(/^./, c => c.toUpperCase())
+      }
+      function toISODate(d){
+        const z = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+        return z.toISOString().slice(0,10)
+      }
+      function fromISODate(iso){
+        const [y,m,da] = iso.split('-').map(Number)
+        return new Date(y, m-1, da)
+      }
+
+      function buildMonthGrid(focus){
+        // start at Monday (ISO 8601)
+        const first = new Date(focus.getFullYear(), focus.getMonth(), 1)
+        const startDay = (first.getDay() + 6) % 7 // Monday=0
+        const start = new Date(first)
+        start.setDate(first.getDate() - startDay)
+        const cells = []
+        for(let i=0;i<42;i++){
+          const d = new Date(start)
+          d.setDate(start.getDate()+i)
+          cells.push(d)
+        }
+        return cells
+      }
+
+      function render(){
+        // header
+        monthLabel.textContent = formatMonthYear(state.focusDate)
+        // days
+        const cells = buildMonthGrid(state.focusDate)
+        daysEl.innerHTML = ''
+        cells.forEach(d => {
+          const iso = toISODate(d)
+          const isOutside = d.getMonth() !== state.focusDate.getMonth()
+          const isToday = iso === toISODate(new Date())
+          const cell = document.createElement('button')
+          cell.className = 'day'
+          cell.setAttribute('data-date', iso)
+          cell.setAttribute('aria-label', d.toLocaleDateString('it-IT'))
+          cell.addEventListener('click', e => openAddDialog(iso))
+          cell.innerHTML = `
+            <div class="num">
+              <span class="${isOutside?'outside':''}">${d.getDate()}</span>
+              ${isToday?'<span class="badge-today">Oggi</span>':''}
+            </div>
+            <div class="events"></div>
+          `
+          // events
+          const events = state.events
+            .filter(ev => ev.date === iso)
+            .sort((a,b) => (a.start||'') > (b.start||'') ? 1 : -1)
+          const container = cell.querySelector('.events')
+          const maxShow = 3
+          events.slice(0,maxShow).forEach(ev => {
+            const item = document.createElement('div')
+            item.className = 'ev'
+            item.setAttribute('data-id', ev.id)
+            item.addEventListener('click', evt => { evt.stopPropagation(); openEditDialog(ev) })
+            item.innerHTML = `
+              <span class="dot" style="background:${ev.color||'#38bdf8'}"></span>
+              <span>${(ev.start?ev.start+' ':'') + escapeHtml(ev.title)}</span>
+            `
+            container.appendChild(item)
+          })
+          if(events.length > maxShow){
+            const more = document.createElement('div')
+            more.className = 'more'
+            more.textContent = `+${events.length - maxShow} altri`
+            container.appendChild(more)
+          }
+          daysEl.appendChild(cell)
+        })
+      }
+
+      function escapeHtml(s){
+        return (s||'').replace(/[&<>"']/g, m => ({
+          '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        }[m]))
+      }
+
+      // Navigation
+      $('#prevBtn').addEventListener('click', () => {
+        const d = new Date(state.focusDate)
+        d.setMonth(d.getMonth()-1)
+        state.focusDate = new Date(d.getFullYear(), d.getMonth(), 1)
+        render()
+      })
+      $('#nextBtn').addEventListener('click', () => {
+        const d = new Date(state.focusDate)
+        d.setMonth(d.getMonth()+1)
+        state.focusDate = new Date(d.getFullYear(), d.getMonth(), 1)
+        render()
+      })
+      $('#todayBtn').addEventListener('click', () => {
+        state.focusDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        render()
+        // Scroll to today cell (if visible)
+        const iso = toISODate(new Date())
+        const el = document.querySelector(`[data-date="${iso}"]`)
+        if(el) el.scrollIntoView({behavior:'smooth', block:'center'})
+      })
+
+      // Add quick event: open dialog on today
+      $('#addQuick').addEventListener('click', () => {
+        const iso = toISODate(new Date())
+        openAddDialog(iso)
+      })
+
+      // Export / Import
+      $('#exportBtn').addEventListener('click', () => {
+        const data = JSON.stringify(state.events, null, 2)
+        const blob = new Blob([data], {type:'application/json'})
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'calendario.json'
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      })
+      $('#importInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0]
+        if(!file) return
+        try{
+          const text = await file.text()
+          const arr = JSON.parse(text)
+          if(!Array.isArray(arr)) throw new Error('Formato non valido')
+          // basic sanitize
+          state.events = arr.filter(x => x && typeof x === 'object' && x.id && x.title && x.date)
+          saveEvents()
+          render()
+          alert('Import completato.')
+        }catch(err){
+          alert('Errore import: ' + err.message)
+        }finally{
+          e.target.value = ''
+        }
+      })
+
+      // Dialog logic
+      const dlg = document.getElementById('eventDlg')
+      const fDate = document.getElementById('evDate')
+      const fTitle = document.getElementById('evTitle')
+      const fStart = document.getElementById('evTimeStart')
+      const fEnd = document.getElementById('evTimeEnd')
+      const fCat = document.getElementById('evCategory')
+      const fNotes = document.getElementById('evNotes')
+      const delBtn = document.getElementById('deleteBtn')
+      const form = document.getElementById('eventForm')
+
+      function openAddDialog(iso){
+        state.selectedDateISO = iso
+        state.editingId = null
+        fDate.value = iso
+        fTitle.value = ''
+        fStart.value = ''
+        fEnd.value = ''
+        fCat.value = '#22c55e'
+        fNotes.value = ''
+        delBtn.style.display = 'none'
+        dlg.showModal()
+      }
+      function openEditDialog(ev){
+        state.selectedDateISO = ev.date
+        state.editingId = ev.id
+        fDate.value = ev.date
+        fTitle.value = ev.title
+        fStart.value = ev.start || ''
+        fEnd.value = ev.end || ''
+        fCat.value = ev.color || '#22c55e'
+        fNotes.value = ev.notes || ''
+        delBtn.style.display = ''
+        dlg.showModal()
+      }
+
+      delBtn.addEventListener('click', () => {
+        if(!state.editingId) return
+        const idx = state.events.findIndex(e => e.id === state.editingId)
+        if(idx >= 0){
+          if(confirm('Eliminare questo evento?')){
+            state.events.splice(idx,1)
+            saveEvents(); render()
+            dlg.close()
+          }
+        }
+      })
+
+      form.addEventListener('submit', (e) => {
+        // when clicking "Salva" (default button)
+        e.preventDefault()
+        const data = {
+          date: fDate.value,
+          title: fTitle.value.trim(),
+          start: fStart.value || null,
+          end: fEnd.value || null,
+          color: fCat.value || '#22c55e',
+          notes: fNotes.value.trim() || null,
+        }
+        if(!data.date || !data.title){
+          alert('Compila almeno Data e Titolo.')
+          return
+        }
+        if(state.editingId){
+          // update
+          const idx = state.events.findIndex(ev => ev.id === state.editingId)
+          if(idx >= 0){
+            state.events[idx] = { ...state.events[idx], ...data }
+          }
+        } else {
+          // create
+          const id = 'ev_' + Math.random().toString(36).slice(2,10)
+          state.events.push({ id, ...data })
+        }
+        saveEvents(); render(); dlg.close()
+      })
+
+      // Initial render
+      render()
+
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if(e.key === 'ArrowLeft' && !dlg.open) $('#prevBtn').click()
+        if(e.key === 'ArrowRight' && !dlg.open) $('#nextBtn').click()
+        if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); $('#exportBtn').click() }
+      })
+    })();
+  </script>
+</body>
+</html>
